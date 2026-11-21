@@ -1,0 +1,29 @@
+{
+  "name": "mantisbt-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server completo para MantisBT com coleta profunda de tarefas atribuídas e não resolvidas para contexto de LLM",
+  "type": "module",
+  "bin": {
+    "mantisbt-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "test": "node --test dist/test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.8.2"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coelho-coie/mantisbt-mcp-Unofficial.git"
+  },
+  "author": "coelho-coie"
+}
