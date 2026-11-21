@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { computeEmbedding } from "./vectorStore.js";
 import { createMantisMcpServer, mantisRequest, normalizeIssueForLLM, normalizeMantisUrls } from "./index.js";
 
 test("normalizeIssueForLLM normalizes issue fields and strips binary payload bloat", () => {
@@ -277,6 +278,56 @@ test("Vector store sync, semantic search, and project efficiency analytics work 
   } finally {
     globalThis.fetch = originalFetch;
     await fs.rm(tmpStorePath, { force: true }).catch(() => {});
+  }
+});
+
+test("computeEmbedding stays local unless MANTIS_ALLOW_EXTERNAL_EMBEDDINGS=true", async () => {
+  const saved = { ...process.env };
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return new Response(JSON.stringify({ data: [{ embedding: [0.1, 0.2] }] }), { status: 200 });
+  };
+  try {
+    process.env.MANTIS_EMBEDDING_API_URL = "https://embed.example.com/v1/embeddings";
+    process.env.MANTIS_EMBEDDING_API_KEY = "k";
+    delete process.env.MANTIS_ALLOW_EXTERNAL_EMBEDDINGS;
+    const local = await computeEmbedding("timeout na API");
+    assert.match(local.mode, /^local-/);
+    assert.equal(fetchCalls, 0);
+    process.env.MANTIS_ALLOW_EXTERNAL_EMBEDDINGS = "true";
+    const remote = await computeEmbedding("timeout na API");
+    assert.match(remote.mode, /^api:/);
+    assert.equal(fetchCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env = saved;
+  }
+});
+
+test("mantisRequest blocks every non-GET call when MANTIS_READ_ONLY=true", async () => {
+  const saved = { ...process.env };
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls++;
+    return new Response("{}", { status: 200 });
+  };
+  try {
+    process.env.MANTIS_BASE_URL = "https://mantis.example.com";
+    process.env.MANTIS_API_TOKEN = "test-token";
+    process.env.MANTIS_ALLOW_DELETE = "true";
+    process.env.MANTIS_READ_ONLY = "true";
+    for (const method of ["POST", "PATCH", "PUT", "DELETE"] as const) {
+      await assert.rejects(mantisRequest("/issues/1", { method }), /MANTIS_READ_ONLY/);
+    }
+    assert.equal(fetchCalls, 0);
+    await mantisRequest("/issues/1");
+    assert.equal(fetchCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env = saved;
   }
 });
 

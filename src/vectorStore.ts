@@ -1,8 +1,23 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import type { MantisIssue } from "./index.js";
 
 const DEFAULT_VECTOR_DIM = 256;
+const execFileAsync = promisify(execFile);
+
+// POSIX modes (0o600) are ignored on Windows, so restrict the ACL to the current user instead.
+// Best effort: a failure is logged but does not block saving.
+async function restrictToCurrentUser(filePath: string): Promise<void> {
+  if (process.platform !== "win32") return;
+  try {
+    await execFileAsync("icacls", [filePath, "/inheritance:r", "/grant:r", `${os.userInfo().username}:F`]);
+  } catch (err) {
+    console.error(`[mantisbt-mcp] Could not restrict permissions on ${filePath}: ${(err as Error).message}`);
+  }
+}
 
 // Stopwords. The project was developed first in Portuguese, so the Portuguese
 // words are kept on purpose: they filter the Portuguese issue text that the
@@ -166,7 +181,9 @@ export async function computeEmbedding(text: string, dimensions = DEFAULT_VECTOR
   const apiKey = process.env.MANTIS_EMBEDDING_API_KEY;
   const model = process.env.MANTIS_EMBEDDING_MODEL || "text-embedding-3-small";
 
-  if (apiUrl && apiKey) {
+  if (apiUrl && apiKey && process.env.MANTIS_ALLOW_EXTERNAL_EMBEDDINGS !== "true") {
+    console.error("[mantisbt-mcp] External embeddings are configured but MANTIS_ALLOW_EXTERNAL_EMBEDDINGS is not 'true'; using local embeddings (issue text is not sent out).");
+  } else if (apiUrl && apiKey) {
     const parsed = new URL(apiUrl);
     const isLocalHost = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
     if (parsed.protocol !== "https:" && !isLocalHost) {
@@ -379,6 +396,7 @@ export class MantisVectorStore {
     await fs.mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
     const tmpPath = `${this.filePath}.${process.pid}.tmp`;
     await fs.writeFile(tmpPath, JSON.stringify(store), { encoding: "utf-8", mode: 0o600 });
+    await restrictToCurrentUser(tmpPath);
     await fs.rename(tmpPath, this.filePath);
   }
 

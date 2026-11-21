@@ -38,7 +38,7 @@ The `main()` call is guarded so that importing `index.ts` in tests does not star
 Configuration is resolved lazily, at each tool call, by `resolveEnvVar()`:
 
 1. The value from `process.env` is used when it is non-empty and is not an unexpanded placeholder such as `${MANTIS_API_TOKEN}`. Some MCP clients pass placeholders verbatim when a variable is unset.
-2. Otherwise, the value is read from a `.env` file. Two locations are checked, in order: the project root (next to `dist/`) and the current working directory.
+2. Otherwise, the value is read from a `.env` file. Only the project root (next to `dist/`) is checked; the working directory is not.
 3. Otherwise, the hard-coded default is used.
 
 See [CONFIGURATION.md](CONFIGURATION.md) for the full list of variables.
@@ -102,7 +102,7 @@ The vector store is a self-contained, file-backed index. It needs no database se
   - Each feature is hashed with FNV-1a (seed `2166136261`) to pick one of 256 buckets. A second FNV-1a hash (different seed) gives a +1 or -1 sign, which reduces collision bias.
   - Feature weights are sublinearly scaled (`1 + ln(count)`), and the result is L2-normalized.
   - No model download and no network access are needed.
-- **External (optional).** When `MANTIS_EMBEDDING_API_URL` is set, the text is sent to an OpenAI-compatible `/embeddings` endpoint using `MANTIS_EMBEDDING_API_KEY` and `MANTIS_EMBEDDING_MODEL`. Dense neural embeddings capture synonyms that hashing cannot, at the cost of network calls and sending issue text to a third party.
+- **External (optional).** When `MANTIS_EMBEDDING_API_URL`, `MANTIS_EMBEDDING_API_KEY` and `MANTIS_ALLOW_EXTERNAL_EMBEDDINGS=true` are set, the text is sent to an OpenAI-compatible `/embeddings` endpoint using `MANTIS_EMBEDDING_API_KEY` and `MANTIS_EMBEDDING_MODEL`. Dense neural embeddings capture synonyms that hashing cannot, at the cost of network calls and sending issue text to a third party.
 
 Because both modes produce vectors of different dimensions and geometry, a store should be re-synced after changing modes.
 

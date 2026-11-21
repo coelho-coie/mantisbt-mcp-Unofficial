@@ -12,16 +12,18 @@ The server is configured through environment variables. Values can come from the
 | `MANTIS_VECTOR_DB_PATH` | No | `.mantis-vector-store.json` in the working directory | File path of the local vector store. |
 | `MANTIS_EMBEDDING_API_URL` | No | unset | OpenAI-compatible `/embeddings` endpoint. When unset, the local 256-dimension embedder is used. |
 | `MANTIS_EMBEDDING_API_KEY` | No | unset | API key for the embedding endpoint. |
+| `MANTIS_ALLOW_EXTERNAL_EMBEDDINGS` | No | `false` | Must be `true` for the embedding endpoint to be used. Without it the local embedder is used even if URL and key are set. |
 | `MANTIS_EMBEDDING_MODEL` | No | `text-embedding-3-small` | Model name sent to the embedding endpoint. |
 | `MANTIS_ALLOW_DELETE` | No | `false` | Set to `true` to allow DELETE calls (delete issue, note, relationship, tag removal). |
 | `MANTIS_ALLOW_HTTP` | No | `false` | Set to `true` to allow a non-https `MANTIS_BASE_URL` on a non-localhost host. The token is then sent in clear text. |
+| `MANTIS_READ_ONLY` | No | `false` | Set to `true` to reject every write call (POST, PATCH, PUT, DELETE). Recommended when issue text is not fully trusted. |
 
 ## Resolution Order
 
 For each variable, the server uses the first value found in this order:
 
 1. `process.env`, if the value is non-empty and is not an unexpanded placeholder such as `${MANTIS_API_TOKEN}`.
-2. A `.env` file in the project root (the parent of `dist/`), then one in the current working directory.
+2. A `.env` file in the project root (the parent of `dist/`). The current working directory is not read.
 3. The default from the table above.
 
 Placeholder detection matters because some MCP clients pass `${VAR}` literally when the variable is not set in their environment. The server then falls back to `.env` instead of using the placeholder as a value.
@@ -72,8 +74,9 @@ Pass the variables through the client's `env` block so they do not depend on the
 ## Security Notes
 
 - The API token grants whatever access the MantisBT account has. Use a dedicated account with the minimum permissions needed.
-- With `MANTIS_EMBEDDING_API_URL` set, issue text is sent to that endpoint. Use it only if the provider is approved for your data.
+- With `MANTIS_EMBEDDING_API_URL`, `MANTIS_EMBEDDING_API_KEY` and `MANTIS_ALLOW_EXTERNAL_EMBEDDINGS=true` set, issue text is sent to that endpoint. Use it only if the provider is approved for your data.
 - Error messages include the first 300 characters of the MantisBT response body. Do not expose the server's stderr to untrusted users.
-- Issue text is untrusted input to your AI client. Require human approval for write tools and keep `MANTIS_ALLOW_DELETE` off unless needed.
+- Issue text is untrusted input to your AI client. Require human approval for write tools, prefer `MANTIS_READ_ONLY=true`, and keep `MANTIS_ALLOW_DELETE` off unless needed.
 - `MANTIS_EMBEDDING_API_URL` must be https (localhost excepted). Redirects are rejected and requests time out after 15 seconds.
-- Configuration is read from the process environment, then `.env` next to the package, then `.env` in the working directory. Run the server from a trusted directory.
+- Configuration is read from the process environment, then `.env` next to the package. The working directory is never read.
+- `.mantis-vector-store.json` is plaintext. On POSIX it is written with `0600`; on Windows the ACL is restricted to the current user via `icacls` (best effort). It is not encrypted.

@@ -16,8 +16,8 @@ function readDotEnvFallback(): Record<string, string> {
   dotEnvCache = {};
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [
+    // Only the package root: a .env in process.cwd() could be planted to redirect the base URL/token.
     path.resolve(moduleDir, "..", ".env"),
-    path.resolve(process.cwd(), ".env"),
   ];
   for (const envPath of candidates) {
     try {
@@ -160,6 +160,9 @@ export async function mantisRequest<T = unknown>(
     );
   }
 
+  if (process.env.MANTIS_READ_ONLY === "true" && options.method && options.method !== "GET") {
+    throw new Error("Write calls are disabled (MANTIS_READ_ONLY=true).");
+  }
   if (options.method === "DELETE" && process.env.MANTIS_ALLOW_DELETE !== "true") {
     throw new Error("Destructive DELETE calls are disabled. Set MANTIS_ALLOW_DELETE=true to enable them.");
   }

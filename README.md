@@ -158,7 +158,7 @@ Use the client's own MCP configuration. The entry must start the compiled server
 }
 ```
 
-Replace `<absolute-path-to-repo>` with the full path to the repository on this machine. Replace the two `<value from .env>` placeholders with the actual values. Where the client accepts it, the `env` block can be omitted if the server reads `.env` from the repository root. The server does this automatically.
+Replace `<absolute-path-to-repo>` with the full path to the repository on this machine. Replace the two `<value from .env>` placeholders with the actual values. Where the client accepts it, the `env` block can be omitted if the server reads `.env` from the repository root (not from the working directory). The server does this automatically.
 
 Where the config file lives depends on the client. Look up the client's documentation for MCP server configuration instead of guessing a path. Save the change, then restart or reload the client so it starts the server.
 
@@ -336,8 +336,10 @@ This section is written for the AI assistant that calls these tools. Follow it t
 | `MANTIS_EMBEDDING_API_URL` | No | local embedder |
 | `MANTIS_EMBEDDING_API_KEY` | No | none |
 | `MANTIS_EMBEDDING_MODEL` | No | `text-embedding-3-small` |
+| `MANTIS_ALLOW_EXTERNAL_EMBEDDINGS` | No | `false` (external embeddings need this opt-in) |
 | `MANTIS_ALLOW_DELETE` | No | `false` (all DELETE calls blocked) |
 | `MANTIS_ALLOW_HTTP` | No | `false` (non-https URLs rejected, except localhost) |
+| `MANTIS_READ_ONLY` | No | `false` (set `true` to block all write calls: POST, PATCH, PUT, DELETE) |
 
 Resolution order, security notes, and examples are in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
@@ -393,7 +395,9 @@ npm test        # Run the test suite
 
 - **Issue content is untrusted.** Anyone who can file or comment on an issue can plant instructions that your AI client may follow (prompt injection). Require human approval for write tools (`update_issue`, `add_issue_note`, `add_issue_attachment`, `create_issue`).
 - **Deletes are off by default.** `delete_issue`, `delete_issue_note`, `delete_issue_relationship`, and tag removal fail unless `MANTIS_ALLOW_DELETE=true`.
+- **Read-only mode.** Set `MANTIS_READ_ONLY=true` to reject every write call; this is the strongest mitigation against prompt injection through issue text.
 - **Use a least-privilege token**, ideally a dedicated read-only account.
+- **Vector store is plaintext.** `.mantis-vector-store.json` holds issue content unencrypted; it is written with mode `0600` on POSIX and with an `icacls` ACL restricted to the current user on Windows (best effort). It is not encrypted.
 - **https is required** for `MANTIS_BASE_URL` and `MANTIS_EMBEDDING_API_URL` (localhost excepted); redirects are not followed.
 - **Embedding API is opt-in.** When configured, issue text leaves your machine.
 - **The vector store holds issue text.** It is written with owner-only permissions and git-ignored; keep it out of shared folders.
